@@ -1,0 +1,64 @@
+name: Build & deploy web to /docs
+
+# Rebuilds the Expo web export on every push to main and publishes it to the
+# /docs folder, which GitHub Pages serves (Settings -> Pages -> Branch: main, /docs).
+# Real Supabase credentials are injected from repository secrets at build time
+# (Expo bakes EXPO_PUBLIC_* vars into the bundle), so the live site has data.
+
+on:
+  push:
+    branches: [main]
+    # Don't retrigger on the bot's own docs commit (it only touches docs/**).
+    paths-ignore:
+      - "docs/**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: deploy-docs
+  cancel-in-progress: true
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Export web build
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+        run: npx expo export -p web
+
+      - name: Assemble docs/ for GitHub Pages
+        run: |
+          rm -rf docs
+          mkdir docs
+          cp -r dist/. docs/
+          touch docs/.nojekyll                 # keep _expo/ (underscore) from being stripped
+          printf 'lishono.org' > docs/CNAME     # custom domain
+          cp docs/index.html docs/404.html      # SPA fallback for deep links
+
+      - name: Commit & push docs/
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs
+          if git diff --cached --quiet; then
+            echo "No changes in docs/ — nothing to deploy."
+          else
+            git commit -m "Deploy web build to /docs [skip ci]"
+            git push
+          fi
