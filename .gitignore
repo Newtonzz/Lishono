@@ -39,5 +39,3 @@ postcss.config.mjs
 tw.bak
 probe.txt
 
-# superseded by root deploy
-/docs/
