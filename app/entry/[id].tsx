@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,9 +11,13 @@ import {
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
-import { colors, maxContentWidth, radius, spacing } from "@/lib/theme";
+import { colors, fonts, maxContentWidth, radius, spacing } from "@/lib/theme";
 import type { Comment, Entry, EntryVariant, ExampleSentence } from "@/lib/types";
 import { StatusBadge } from "@/components/StatusBadge";
+import { Tag, Pos } from "@/components/Tag";
+import { SectionHead } from "@/components/SectionHead";
+import { AudioButton } from "@/components/AudioButton";
+import { Icon } from "@/components/Icon";
 
 export default function EntryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -26,7 +29,7 @@ export default function EntryScreen() {
   const [examples, setExamples] = useState<ExampleSentence[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
   const [score, setScore] = useState(0);
-  const [myVote, setMyVote] = useState<number>(0);
+  const [myVote, setMyVote] = useState(0);
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -55,14 +58,14 @@ export default function EntryScreen() {
     load();
   }, [load]);
 
-  const vote = async (value: 1 | -1) => {
+  const vote = async () => {
     if (!session) return router.push("/login");
-    const next = myVote === value ? 0 : value;
+    const next = myVote === 1 ? 0 : 1;
     if (next === 0) {
       await supabase.from("votes").delete().match({ entry_id: id, user_id: session.user.id });
     } else {
       await supabase.from("votes").upsert(
-        { entry_id: id as string, user_id: session.user.id, value: next },
+        { entry_id: id as string, user_id: session.user.id, value: 1 },
         { onConflict: "entry_id,user_id" }
       );
     }
@@ -85,118 +88,203 @@ export default function EntryScreen() {
   if (loading) return <ActivityIndicator style={{ marginTop: spacing.xl }} color={colors.accent} />;
   if (!entry) return <Text style={styles.missing}>Entry not found.</Text>;
 
+  const verified = entry.status === "verified";
+
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.inner}>
-      <View style={styles.headRow}>
-        <Text style={styles.latin}>{entry.primary_latin}</Text>
-        <StatusBadge status={entry.status} />
-      </View>
-      {entry.serto ? <Text style={styles.serto}>{entry.serto}</Text> : null}
-      <Text style={styles.english}>{entry.english}</Text>
-      {entry.dutch ? <Text style={styles.secondary}>Dutch: {entry.dutch}</Text> : null}
+      <Pressable style={styles.crumb} onPress={() => router.push("/")}>
+        <Icon name="chevronLeft" size={15} color={colors.ink3} />
+        <Text style={styles.crumbText}>All words</Text>
+      </Pressable>
 
-      <View style={styles.tagRow}>
-        {entry.dialect_tag ? <Text style={styles.tag}>{entry.dialect_tag}</Text> : null}
-        {entry.category ? <Text style={styles.tag}>{entry.category}</Text> : null}
-      </View>
-
-      <View style={styles.voteRow}>
-        <Pressable onPress={() => vote(1)} style={[styles.voteBtn, myVote === 1 && styles.voteUp]}>
-          <Text style={[styles.voteText, myVote === 1 && styles.voteTextActive]}>▲ matches</Text>
-        </Pressable>
-        <Text style={styles.score}>{score > 0 ? `+${score}` : score}</Text>
-        <Pressable onPress={() => vote(-1)} style={[styles.voteBtn, myVote === -1 && styles.voteDown]}>
-          <Text style={[styles.voteText, myVote === -1 && styles.voteTextActive]}>▼ off</Text>
-        </Pressable>
+      {/* Hero */}
+      <View style={styles.headline}>
+        <View style={styles.word}>
+          <Text style={styles.latin}>{entry.primary_latin}</Text>
+          {!!entry.serto && <Text style={styles.syr}>{entry.serto}</Text>}
+        </View>
+        <View style={styles.heroAside}>
+          <StatusBadge status={entry.status} />
+          <AudioButton />
+        </View>
       </View>
 
-      {variants.length > 0 && (
-        <Section title="Spelling variants">
-          {variants.map((v) => (
-            <Text key={v.id} style={styles.listItem}>
-              <Text style={styles.bold}>{v.latin_form}</Text>
-              {v.note ? <Text style={styles.secondary}>  — {v.note}</Text> : null}
-            </Text>
-          ))}
-        </Section>
+      <View style={styles.pron}>
+        <Pos>{entry.category ?? "word"}</Pos>
+        <Text style={styles.dot}>·</Text>
+        <Tag label={entry.dialect_tag ?? "General"} />
+      </View>
+
+      <View style={styles.verLine}>
+        {verified ? (
+          <Icon name="check" size={16} stroke={2.5} color={colors.verified} />
+        ) : (
+          <View style={styles.pendDot} />
+        )}
+        <Text style={styles.verText}>
+          {verified ? "Verified entry" : "Pending — awaiting steward review"}
+        </Text>
+      </View>
+
+      {/* Meaning */}
+      <View style={styles.section}>
+        <SectionHead title="Meaning" syr="ܣܘܟܠܐ" />
+        <View>
+          <DefLang flag="🇬🇧" text={entry.english} first />
+          {!!entry.dutch && <DefLang flag="🇳🇱" text={entry.dutch} />}
+        </View>
+      </View>
+
+      {/* Variants + heard in */}
+      {(variants.length > 0 || entry.dialect_tag) && (
+        <View style={styles.section}>
+          {variants.length > 0 && (
+            <View style={styles.kvRow}>
+              <Text style={styles.kvKey}>VARIANTS</Text>
+              <View style={styles.variantList}>
+                {variants.map((v) => (
+                  <Text key={v.id} style={styles.variant}>{v.latin_form}</Text>
+                ))}
+              </View>
+            </View>
+          )}
+          <View style={styles.kvRow}>
+            <Text style={styles.kvKey}>HEARD IN</Text>
+            <View style={styles.variantList}>
+              <Tag label={entry.dialect_tag ?? "Tur Abdin"} />
+            </View>
+          </View>
+        </View>
       )}
 
+      {/* Examples */}
       {examples.length > 0 && (
-        <Section title="Examples">
-          {examples.map((ex) => (
-            <View key={ex.id} style={styles.example}>
+        <View style={styles.section}>
+          <SectionHead title="In a sentence" syr="ܒܚܕ ܡܡܠܠܐ" />
+          {examples.map((ex, i) => (
+            <View key={ex.id} style={[styles.example, i > 0 && styles.exampleRuled]}>
+              {!!ex.serto && <Text style={styles.exSyr}>{ex.serto}</Text>}
               <Text style={styles.exLatin}>{ex.latin}</Text>
-              {ex.serto ? <Text style={styles.exSerto}>{ex.serto}</Text> : null}
-              {ex.english ? <Text style={styles.secondary}>{ex.english}</Text> : null}
+              {!!ex.english && <Text style={styles.exTrans}>🇬🇧  {ex.english}</Text>}
             </View>
           ))}
-        </Section>
+        </View>
       )}
 
-      <Section title={`Comments (${comments.length})`}>
+      {/* Votes */}
+      <View style={styles.section}>
+        <View style={styles.votebar}>
+          <Pressable style={[styles.voteBtn, myVote === 1 && styles.voteCast]} onPress={vote}>
+            <Icon name="arrowUp" size={16} stroke={2.4} color={myVote === 1 ? colors.accentStrong : colors.ink2} />
+            <Text style={[styles.voteCount, myVote === 1 && styles.voteCastText]}>{score}</Text>
+            <Text style={[styles.voteLabel, myVote === 1 && styles.voteCastText]}>{myVote === 1 ? "Upvoted" : "Useful"}</Text>
+          </Pressable>
+          <Text style={styles.voteHint}>Upvotes help stewards prioritise which words to verify next.</Text>
+        </View>
+      </View>
+
+      {/* Discussion */}
+      <View style={styles.section}>
+        <SectionHead title="Discussion" syr="ܡܡܠܠܐ" right={<Text style={styles.count}>{comments.length} {comments.length === 1 ? "note" : "notes"}</Text>} />
         {comments.length === 0 ? (
-          <Text style={styles.secondary}>No comments yet. Add context your family knows.</Text>
+          <Text style={styles.noNotes}>No notes yet. Share a regional spelling, a memory, or a correction.</Text>
         ) : (
           comments.map((c) => (
             <View key={c.id} style={styles.comment}>
-              <Text style={styles.commentBody}>{c.body}</Text>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{(c.body[0] || "·").toUpperCase()}</Text>
+              </View>
+              <View style={styles.commentBody}>
+                <Text style={styles.commentText}>{c.body}</Text>
+              </View>
             </View>
           ))
         )}
-        <TextInput
-          style={styles.commentInput}
-          placeholder={session ? "Add context (“my grandmother from Midyat says it harder”)" : "Log in to comment"}
-          placeholderTextColor={colors.muted}
-          value={draft}
-          onChangeText={setDraft}
-          editable={!!session}
-          multiline
-        />
-        <Pressable style={styles.primary} onPress={postComment}>
-          <Text style={styles.primaryText}>Post comment</Text>
-        </Pressable>
-      </Section>
+        <View style={styles.commentBox}>
+          <TextInput
+            style={styles.commentInput}
+            placeholder={session ? "Add a note — a variant, a memory, a correction…" : "Log in to add a note"}
+            placeholderTextColor={colors.ink4}
+            value={draft}
+            onChangeText={setDraft}
+            editable={!!session}
+            multiline
+          />
+          <Pressable style={[styles.postBtn, !draft.trim() && styles.postDisabled]} onPress={postComment} disabled={!draft.trim()}>
+            <Text style={styles.postText}>Post note</Text>
+          </Pressable>
+        </View>
+      </View>
     </ScrollView>
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function DefLang({ flag, text, first }: { flag: string; text: string; first?: boolean }) {
   return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      {children}
+    <View style={[styles.defLang, !first && styles.defRuled]}>
+      <Text style={styles.dlFlag}>{flag}</Text>
+      <Text style={styles.dlText}>{text}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.sand },
-  inner: { width: "100%", maxWidth: maxContentWidth, alignSelf: "center", padding: spacing.md, paddingBottom: spacing.xl },
-  missing: { padding: spacing.lg, color: colors.muted },
-  headRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm },
-  latin: { fontSize: 30, fontWeight: "800", color: colors.ink },
-  serto: { fontSize: 30, color: colors.clay, marginTop: 2 },
-  english: { fontSize: 18, color: colors.inkSoft, marginTop: spacing.sm },
-  secondary: { fontSize: 14, color: colors.muted },
-  tagRow: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm, flexWrap: "wrap" },
-  tag: { fontSize: 13, color: colors.muted, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 },
-  voteRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, marginTop: spacing.lg },
-  voteBtn: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: 8, backgroundColor: colors.card },
-  voteUp: { borderColor: colors.green, backgroundColor: "#eaf6ef" },
-  voteDown: { borderColor: colors.red, backgroundColor: "#fcebeb" },
-  voteText: { color: colors.inkSoft, fontWeight: "600", fontSize: 13 },
-  voteTextActive: { color: colors.ink },
-  score: { fontSize: 18, fontWeight: "700", color: colors.ink, minWidth: 36, textAlign: "center" },
-  section: { marginTop: spacing.lg, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.md },
-  sectionTitle: { fontSize: 16, fontWeight: "700", color: colors.ink, marginBottom: spacing.sm },
-  listItem: { fontSize: 15, color: colors.inkSoft, marginBottom: 4 },
-  bold: { fontWeight: "700", color: colors.ink },
-  example: { marginBottom: spacing.md },
-  exLatin: { fontSize: 16, color: colors.ink },
-  exSerto: { fontSize: 17, color: colors.clay },
-  comment: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, padding: spacing.md, marginBottom: spacing.sm },
-  commentBody: { fontSize: 14, color: colors.ink, lineHeight: 20 },
-  commentInput: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, padding: spacing.md, fontSize: 14, color: colors.ink, minHeight: 60, marginTop: spacing.sm, textAlignVertical: "top" },
-  primary: { backgroundColor: colors.accent, borderRadius: radius.sm, paddingVertical: 10, alignItems: "center", marginTop: spacing.sm },
-  primaryText: { color: "#fff", fontWeight: "700" },
+  screen: { flex: 1, backgroundColor: colors.paper },
+  inner: { width: "100%", maxWidth: maxContentWidth, alignSelf: "center", paddingHorizontal: 18, paddingTop: 16, paddingBottom: 48, gap: 28 },
+  missing: { padding: spacing.lg, color: colors.ink3, fontFamily: fonts.body },
+
+  crumb: { flexDirection: "row", alignItems: "center", gap: 7, alignSelf: "flex-start" },
+  crumbText: { fontSize: 13.5, color: colors.ink3, fontFamily: fonts.body },
+
+  headline: { flexDirection: "row", alignItems: "flex-start", gap: 20, flexWrap: "wrap" },
+  word: { gap: 6, flexShrink: 1 },
+  latin: { fontFamily: fonts.head, fontSize: 52, color: colors.ink, letterSpacing: -0.5 },
+  syr: { fontFamily: fonts.syr, fontSize: 48, color: colors.accent, writingDirection: "rtl", lineHeight: 64 },
+  heroAside: { marginLeft: "auto", alignItems: "flex-end", gap: 12 },
+
+  pron: { flexDirection: "row", alignItems: "center", gap: 12, flexWrap: "wrap" },
+  dot: { color: colors.rule3 },
+
+  verLine: { flexDirection: "row", alignItems: "center", gap: 9 },
+  pendDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.pending },
+  verText: { fontSize: 14, color: colors.ink2, fontFamily: fonts.body },
+
+  section: {},
+  defLang: { flexDirection: "row", gap: 10, alignItems: "baseline", paddingVertical: 10 },
+  defRuled: { borderTopWidth: 1, borderTopColor: colors.rule },
+  dlFlag: { fontSize: 15, width: 22 },
+  dlText: { fontSize: 17, color: colors.ink, flex: 1, fontFamily: fonts.body },
+
+  kvRow: { flexDirection: "row", gap: 22, alignItems: "baseline", marginBottom: 16 },
+  kvKey: { fontSize: 12.5, color: colors.ink3, letterSpacing: 1, fontFamily: fonts.bodySemi, width: 84 },
+  variantList: { flexDirection: "row", flexWrap: "wrap", gap: 10, flex: 1 },
+  variant: { fontFamily: fonts.head, fontSize: 16, color: colors.ink },
+
+  example: { paddingVertical: 16, gap: 7 },
+  exampleRuled: { borderTopWidth: 1, borderTopColor: colors.rule },
+  exSyr: { fontFamily: fonts.syr, fontSize: 22, color: colors.ink, writingDirection: "rtl", lineHeight: 36 },
+  exLatin: { fontFamily: fonts.headItalic, fontSize: 17, color: colors.ink },
+  exTrans: { fontSize: 15, color: colors.ink2, fontFamily: fonts.body },
+
+  votebar: { flexDirection: "row", alignItems: "center", gap: 10, flexWrap: "wrap" },
+  voteBtn: { flexDirection: "row", alignItems: "center", gap: 7, backgroundColor: colors.paper2, borderWidth: 1, borderColor: colors.rule2, borderRadius: radius.md, paddingVertical: 9, paddingHorizontal: 14 },
+  voteCast: { backgroundColor: colors.accentTint, borderColor: colors.accent },
+  voteCount: { fontFamily: fonts.bodySemi, fontSize: 14, color: colors.ink2 },
+  voteLabel: { fontFamily: fonts.bodySemi, fontSize: 14, color: colors.ink2 },
+  voteCastText: { color: colors.accentStrong },
+  voteHint: { color: colors.ink2, fontSize: 13.5, fontFamily: fonts.body, flex: 1 },
+
+  count: { fontSize: 13, color: colors.ink3, fontFamily: fonts.body },
+  noNotes: { color: colors.ink3, fontSize: 14.5, paddingVertical: 8, fontFamily: fonts.body },
+  comment: { flexDirection: "row", gap: 13, paddingVertical: 16, borderTopWidth: 1, borderTopColor: colors.rule },
+  avatar: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.ink2, alignItems: "center", justifyContent: "center" },
+  avatarText: { color: colors.paper2, fontFamily: fonts.headSemi, fontSize: 13 },
+  commentBody: { flex: 1 },
+  commentText: { fontSize: 15, color: colors.ink, lineHeight: 22, fontFamily: fonts.body },
+
+  commentBox: { gap: 10, paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.rule, alignItems: "flex-end" },
+  commentInput: { width: "100%", minHeight: 60, backgroundColor: colors.paper2, borderWidth: 1, borderColor: colors.rule2, borderRadius: radius.md, padding: 13, fontSize: 15, color: colors.ink, fontFamily: fonts.body, textAlignVertical: "top" },
+  postBtn: { backgroundColor: colors.accent, borderRadius: radius.md, paddingVertical: 8, paddingHorizontal: 16 },
+  postDisabled: { opacity: 0.5 },
+  postText: { color: colors.paper2, fontFamily: fonts.bodySemi, fontSize: 14 },
 });
