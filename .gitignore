@@ -1,0 +1,40 @@
+# dependencies
+node_modules/
+
+# expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# native
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# metro
+.metro-health-check*
+
+# secrets — never commit these
+.env
+.env*.local
+
+# misc
+.DS_Store
+*.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# editor
+.idea/
+.vscode/
+
+# stray files from initial Next.js scaffold (sandbox could not delete; safe to remove locally)
+next.config.mjs
+postcss.config.mjs
+tw.bak
+probe.txt
