@@ -18,6 +18,7 @@ import { Emblem, HomelandMap } from "@/components/Emblem";
 import { Icon } from "@/components/Icon";
 import { SectionHead } from "@/components/SectionHead";
 import { EntryCard } from "@/components/EntryCard";
+import { Footer } from "@/components/Footer";
 
 const EXAMPLES = ["shlomo", "bayto", "emo", "babo", "tawdi"];
 
@@ -175,6 +176,8 @@ export default function HomeScreen() {
           <Text style={styles.ctaText}>Contribute a word</Text>
         </Pressable>
       </View>
+
+      <Footer />
     </ScrollView>
   );
 }

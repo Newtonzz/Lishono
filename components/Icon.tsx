@@ -4,7 +4,7 @@ import { colors } from "@/lib/theme";
 
 export type IconName =
   | "search" | "play" | "chevronRight" | "chevronLeft" | "arrowUp"
-  | "plus" | "check" | "mic" | "upload" | "reply" | "book" | "quill" | "sound";
+  | "plus" | "check" | "mic" | "upload" | "reply" | "book" | "quill" | "sound" | "github";
 
 export function Icon({ name, size = 20, stroke = 2, color = colors.ink2 }: { name: IconName; size?: number; stroke?: number; color?: string }) {
   const common = { stroke: color, strokeWidth: stroke, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, fill: "none" };
@@ -34,6 +34,8 @@ export function Icon({ name, size = 20, stroke = 2, color = colors.ink2 }: { nam
         return (<><Path d="M3 21l4-1 11-11a2.5 2.5 0 0 0-3.5-3.5L3.5 16.5 3 21z" {...common} /><Line x1={13} y1={6} x2={18} y2={11} {...common} /></>);
       case "sound":
         return (<><Polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill={color} /><Path d="M15.54 8.46a5 5 0 0 1 0 7.07" {...common} /></>);
+      case "github":
+        return <Path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22" {...common} />;
       default:
         return null;
     }
